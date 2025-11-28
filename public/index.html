@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cursor AI Rules - Share & Discover</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body>
+  <div x-data="rulesApp()" x-init="init()">
+    <!-- Header -->
+    <header class="header">
+      <div class="container">
+        <div class="header-content">
+          <div class="logo">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <rect width="32" height="32" rx="8" fill="url(#gradient)"/>
+              <path d="M16 8L24 16L16 24L8 16L16 8Z" fill="white"/>
+              <defs>
+                <linearGradient id="gradient" x1="0" y1="0" x2="32" y2="32">
+                  <stop offset="0%" stop-color="#8B5CF6"/>
+                  <stop offset="100%" stop-color="#EC4899"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <h1>Cursor AI Rules</h1>
+          </div>
+          <button @click="showUploadModal = true" class="btn-primary">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 5L10 15M5 10L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Upload Rule
+          </button>
+        </div>
+        <p class="subtitle">Development guidelines & best practices for Cursor IDE</p>
+      </div>
+    </header>
+
+    <!-- Search and Filter Section -->
+    <section class="search-section">
+      <div class="container">
+        <div class="search-box">
+          <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="2"/>
+            <path d="M14 14L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <input 
+            type="text" 
+            placeholder="Search rules by name or tag..."
+            x-model="searchQuery"
+            @input.debounce.300ms="search()"
+            class="search-input"
+          >
+        </div>
+
+        <!-- Tag Filters -->
+        <div class="filter-section">
+          <button 
+            @click="filterByTag('')"
+            :class="{'active': selectedTag === ''}"
+            class="filter-btn"
+          >
+            All
+          </button>
+          <template x-for="tag in popularTags" :key="tag.name">
+            <button 
+              @click="filterByTag(tag.name)"
+              :class="{'active': selectedTag === tag.name}"
+              class="filter-btn"
+              x-text="tag.name + (tag.count > 0 ? ' (' + tag.count + ')' : '')"
+            ></button>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Rules Grid -->
+    <section class="rules-section">
+      <div class="container">
+        <div class="rules-header">
+          <h2>
+            <span x-show="selectedTag === ''">All Rules</span>
+            <span x-show="selectedTag !== ''" x-text="selectedTag + ' Rules'"></span>
+          </h2>
+          <span class="count" x-text="rules.length + ' rules found'"></span>
+        </div>
+
+        <!-- Loading State -->
+        <div x-show="loading" class="loading">
+          <div class="spinner"></div>
+          <p>Loading rules...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div x-show="!loading && rules.length === 0" class="empty-state">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <circle cx="32" cy="32" r="30" stroke="currentColor" stroke-width="2" opacity="0.2"/>
+            <path d="M32 20V32M32 40V44" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <h3>No rules found</h3>
+          <p>Try adjusting your search or filter criteria</p>
+        </div>
+
+        <!-- Rules Grid -->
+        <div x-show="!loading && rules.length > 0" class="rules-grid">
+          <template x-for="rule in rules" :key="rule.id">
+            <div class="rule-card">
+              <div class="rule-header">
+                <h3 x-text="rule.title"></h3>
+                <span class="file-size" x-text="formatFileSize(rule.file_size)"></span>
+              </div>
+              
+              <p class="rule-description" x-text="rule.description || 'No description provided'"></p>
+              
+              <div class="rule-tags">
+                <template x-for="tag in rule.tags" :key="tag">
+                  <span class="tag" @click="filterByTag(tag)" x-text="tag"></span>
+                </template>
+              </div>
+
+              <div class="rule-footer">
+                <span class="date" x-text="formatDate(rule.created_at)"></span>
+                <a 
+                  :href="'/uploads/' + rule.filename" 
+                  download 
+                  class="btn-download"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 2V10M8 10L5 7M8 10L11 7M2 12V13C2 13.5523 2.44772 14 3 14H13C13.5523 14 14 13.5523 14 13V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                  Download
+                </a>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upload Modal -->
+    <div 
+      x-show="showUploadModal" 
+      x-transition
+      class="modal-overlay"
+      @click.self="showUploadModal = false"
+    >
+      <div class="modal">
+        <div class="modal-header">
+          <h2>Upload New Rule</h2>
+          <button @click="showUploadModal = false" class="btn-close">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6L18 18M6 18L18 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <form @submit.prevent="uploadRule()" class="upload-form">
+          <div class="form-group">
+            <label for="title">Title *</label>
+            <input 
+              type="text" 
+              id="title" 
+              x-model="uploadForm.title"
+              placeholder="e.g. React Best Practices"
+              required
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea 
+              id="description" 
+              x-model="uploadForm.description"
+              placeholder="Describe your rule..."
+              rows="3"
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="tags">Tags</label>
+            <input 
+              type="text" 
+              id="tags" 
+              x-model="uploadForm.tags"
+              placeholder="React, TypeScript, Frontend (comma separated)"
+            >
+            <small>Separate tags with commas</small>
+          </div>
+
+          <div class="form-group">
+            <label for="file">File *</label>
+            <div class="file-input-wrapper">
+              <input 
+                type="file" 
+                id="file" 
+                @change="handleFileChange($event)"
+                accept=".cursorrules,.md,.txt"
+                required
+              >
+              <div class="file-input-label">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5V15M12 5L9 8M12 5L15 8M5 17V18C5 19.1046 5.89543 20 7 20H17C18.1046 20 19 19.1046 19 18V17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span x-text="uploadForm.fileName || 'Choose file (.cursorrules, .md, .txt)'"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" @click="showUploadModal = false" class="btn-secondary">
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              class="btn-primary"
+              :disabled="uploading"
+            >
+              <span x-show="!uploading">Upload</span>
+              <span x-show="uploading">Uploading...</span>
+            </button>
+          </div>
+
+          <div x-show="uploadError" class="alert alert-error" x-text="uploadError"></div>
+          <div x-show="uploadSuccess" class="alert alert-success">Rule uploaded successfully!</div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function rulesApp() {
+      return {
+        rules: [],
+        popularTags: [],
+        searchQuery: '',
+        selectedTag: '',
+        loading: false,
+        showUploadModal: false,
+        uploading: false,
+        uploadError: '',
+        uploadSuccess: false,
+        uploadForm: {
+          title: '',
+          description: '',
+          tags: '',
+          file: null,
+          fileName: ''
+        },
+
+        async init() {
+          await this.loadRules();
+          await this.loadTags();
+        },
+
+        async loadRules() {
+          this.loading = true;
+          try {
+            const response = await fetch('/api/rules');
+            this.rules = await response.json();
+          } catch (error) {
+            console.error('Error loading rules:', error);
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async loadTags() {
+          try {
+            const response = await fetch('/api/tags');
+            const tags = await response.json();
+            this.popularTags = tags.filter(tag => ['Frontend', 'Backend', 'Database', 'React', 'TypeScript', 'API'].includes(tag.name));
+          } catch (error) {
+            console.error('Error loading tags:', error);
+          }
+        },
+
+        async search() {
+          if (this.searchQuery.trim() === '') {
+            await this.loadRules();
+            return;
+          }
+
+          this.loading = true;
+          try {
+            const response = await fetch(`/api/rules/search?q=${encodeURIComponent(this.searchQuery)}`);
+            this.rules = await response.json();
+          } catch (error) {
+            console.error('Error searching:', error);
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async filterByTag(tag) {
+          this.selectedTag = tag;
+          this.searchQuery = '';
+          
+          if (tag === '') {
+            await this.loadRules();
+            return;
+          }
+
+          this.loading = true;
+          try {
+            const response = await fetch(`/api/rules/tag/${encodeURIComponent(tag)}`);
+            this.rules = await response.json();
+          } catch (error) {
+            console.error('Error filtering by tag:', error);
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        handleFileChange(event) {
+          const file = event.target.files[0];
+          if (file) {
+            this.uploadForm.file = file;
+            this.uploadForm.fileName = file.name;
+          }
+        },
+
+        async uploadRule() {
+          this.uploading = true;
+          this.uploadError = '';
+          this.uploadSuccess = false;
+
+          const formData = new FormData();
+          formData.append('file', this.uploadForm.file);
+          formData.append('title', this.uploadForm.title);
+          formData.append('description', this.uploadForm.description);
+          formData.append('tags', this.uploadForm.tags);
+
+          try {
+            const response = await fetch('/api/rules/upload', {
+              method: 'POST',
+              body: formData
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+              throw new Error(data.error || 'Upload failed');
+            }
+
+            this.uploadSuccess = true;
+            
+            // Reset form
+            this.uploadForm = {
+              title: '',
+              description: '',
+              tags: '',
+              file: null,
+              fileName: ''
+            };
+
+            // Reload rules
+            await this.loadRules();
+            await this.loadTags();
+
+            // Close modal after delay
+            setTimeout(() => {
+              this.showUploadModal = false;
+              this.uploadSuccess = false;
+            }, 2000);
+
+          } catch (error) {
+            this.uploadError = error.message;
+          } finally {
+            this.uploading = false;
+          }
+        },
+
+        formatFileSize(bytes) {
+          if (bytes < 1024) return bytes + ' B';
+          if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+          return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        },
+
+        formatDate(dateString) {
+          const date = new Date(dateString);
+          const now = new Date();
+          const diff = now - date;
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+          if (days <= 0) return 'Today';
+          if (days === 1) return 'Yesterday';
+          if (days < 7) return days + ' days ago';
+          if (days < 30) return Math.floor(days / 7) + ' weeks ago';
+          if (days < 365) return Math.floor(days / 30) + ' months ago';
+          return date.toLocaleDateString();
+        }
+      }
+    }
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,51 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun.lockb
+
+# Database (will be created in container)
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads (will be created in container)
+uploads/
+
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+README.md
+QUICKSTART.md
+*.md
+
+# Test files
+test-rule.md
+*.test.js
+*.spec.js
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+
